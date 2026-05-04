@@ -452,16 +452,13 @@
         const exportBtn = document.getElementById('exportBtn');
         const clearBtn = document.getElementById('clearBtn');
 
-        let fetchedCount = 0;
         let phoneCount = 0;
         let allResults = [];
         let isSearching = false;
         let placesService;
-        let pageCount = 0;
-        let currentLocalityIndex = 0;
-        let localitiesToSearch = [];
-        let currentBusinessType = "";
-        let currentCity = "";
+
+        let allRawPlaces = new Map();
+        let shouldStop = false;
 
         const defaultLocalities = {
             'bangalore': 'Mathikere, Indiranagar, New BEL Road, Whitefield, Koramangala, Jayanagar, JP Nagar, HSR Layout, BTM Layout, Electronic City, Marathahalli, Bellandur, Malleshwaram, Rajajinagar, Banashankari, Yelahanka, Hebbal, Kengeri, Basavanagudi, Frazer Town, RT Nagar, Vidyaranyapura, Yelahanka New Town, Kammanahalli, Kalyan Nagar, HBR Layout, Sahakara Nagar, Peenya, Yeshwanthpur, Dasarahalli, Nagarbhavi, Vijay Nagar, Mahalakshmi Layout, Basaveshwaranagar, Rajarajeshwari Nagar',
@@ -519,121 +516,181 @@
         searchBtn.addEventListener('click', performSearch);
         exportBtn.addEventListener('click', exportCSV);
         clearBtn.addEventListener('click', () => {
+            shouldStop = true;
+            isSearching = false;
             allResults = [];
             phoneCount = 0;
             resultsList.innerHTML = '';
             exportBtn.style.display = 'none';
             clearBtn.style.display = 'none';
+            allRawPlaces.clear();
+            searchBtn.disabled = false;
+            businessTypeInput.disabled = false;
+            cityInput.disabled = false;
+            localitiesInput.disabled = false;
+            searchBtn.classList.remove('searching');
             updateStatus('Results cleared.');
         });
 
-        function performSearch() {
-            const bType = businessTypeInput.value.trim();
-            const city = cityInput.value.trim();
-            const locs = localitiesInput.value.trim();
-            
-            if (!bType || !city || isSearching || !placesService) return;
+        const delay = (ms) => new Promise(res => setTimeout(res, ms));
 
-            localitiesToSearch = locs ? locs.split(',').map(s => s.trim()).filter(Boolean) : [""];
+        function getQueryVariants(bType, loc, city) {
+            const bTypeLower = bType.toLowerCase();
+            const isTravel = bTypeLower.includes('travel') || bTypeLower.includes('tour') || bTypeLower.includes('trip') || bTypeLower.includes('holiday') || bTypeLower.includes('ticket') || bTypeLower.includes('visa');
 
-            currentBusinessType = bType;
-            currentCity = city;
-            currentLocalityIndex = 0;
+            let variants = [];
+            let locationStr = loc === city ? city : `${loc}, ${city}`;
+            if (!loc && city) locationStr = city;
+            if (loc && !city) locationStr = loc;
 
-            isSearching = true;
-            searchBtn.disabled = true;
-            businessTypeInput.disabled = true;
-            cityInput.disabled = true;
-            localitiesInput.disabled = true;
-            searchBtn.classList.add('searching');
-            // We no longer clear allResults or phoneCount so they accumulate across searches
-            // But we do want to hide the error message
-            errorEl.style.display = 'none';
-            fetchedCount = 0;
-            updateStatus('Starting search sequence...');
-
-            searchNextLocality();
-        }
-
-        function searchNextLocality() {
-            if (currentLocalityIndex >= localitiesToSearch.length || !isSearching) {
-                finishSearch();
-                return;
-            }
-
-            const locality = localitiesToSearch[currentLocalityIndex];
-            pageCount = 1;
-            
-            if (locality) {
-                updateStatus(`Searching in ${locality} (${currentLocalityIndex + 1}/${localitiesToSearch.length})...`);
+            if (isTravel) {
+                variants.push(`travel agency ${locationStr}`);
+                variants.push(`tour operator ${locationStr}`);
+                variants.push(`tour and travels ${locationStr}`);
+                variants.push(`holiday planner ${locationStr}`);
+                variants.push(`trip planner ${locationStr}`);
+                variants.push(`ticket booking ${locationStr}`);
+                variants.push(`bus booking ${locationStr}`);
+                variants.push(`visa agent ${locationStr}`);
+                variants.push(`travels ${locationStr}`);
+                variants.push(`travel office ${locationStr}`);
+                variants.push(`travel agent near ${locationStr}`);
+                variants.push(`${locationStr} tours and travels`);
             } else {
-                updateStatus(`Searching in ${currentCity}...`);
+                variants.push(`${bType} ${locationStr}`);
+                variants.push(`${bType} near ${locationStr}`);
+                variants.push(`${locationStr} ${bType}`);
+                variants.push(`${bType} office ${locationStr}`);
+                variants.push(`${bType} agency ${locationStr}`);
+                variants.push(`${bType} services ${locationStr}`);
+                variants.push(`${bType} agent ${locationStr}`);
             }
-            
-            const query = locality ? `${currentBusinessType} in ${locality}, ${currentCity}` : `${currentBusinessType} in ${currentCity}`;
-            const request = { query: query };
-            
-            placesService.textSearch(request, handleSearchResults);
+            return [...new Set(variants)];
         }
 
-        async function handleSearchResults(results, status, pagination) {
-            if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS && fetchedCount === 0 && currentLocalityIndex === 0 && localitiesToSearch.length === 1) {
-                errorEl.style.display = 'block';
-                errorEl.textContent = "No results found for this query";
-                finishSearch();
-                return;
-            }
+        async function performTextSearchWithPagination(query) {
+            return new Promise((resolve) => {
+                let fetchedInThisSearch = 0;
+                let pageCount = 1;
+                let retries = 3;
 
-            if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
-                updateStatus(`Rate limit hit. Waiting 5s before retrying ${localitiesToSearch[currentLocalityIndex]}...`);
-                setTimeout(() => {
-                    if (pagination && pagination.hasNextPage) {
-                        pagination.nextPage();
-                    } else {
-                        const query = localitiesToSearch[currentLocalityIndex] ? `${currentBusinessType} in ${localitiesToSearch[currentLocalityIndex]}, ${currentCity}` : `${currentBusinessType} in ${currentCity}`;
-                        placesService.textSearch({ query: query }, handleSearchResults);
+                function handleResponse(results, status, pagination) {
+                    if (shouldStop) return resolve(fetchedInThisSearch);
+
+                    if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
+                        if (retries > 0) {
+                            retries--;
+                            setTimeout(() => {
+                                if (pagination && pagination.hasNextPage) pagination.nextPage();
+                                else placesService.textSearch({ query }, handleResponse);
+                            }, 5000);
+                        } else {
+                            resolve(fetchedInThisSearch);
+                        }
+                        return;
                     }
-                }, 5000);
-                return;
-            }
 
-            if (status === google.maps.places.PlacesServiceStatus.INVALID_REQUEST) {
-                finishSearch();
-                return;
-            }
+                    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                        fetchedInThisSearch += results.length;
+                        for (const p of results) {
+                            if (!allRawPlaces.has(p.place_id)) {
+                                allRawPlaces.set(p.place_id, { place_id: p.place_id, name: p.name });
+                            }
+                        }
+                    }
 
-            if (status !== google.maps.places.PlacesServiceStatus.OK && status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-                errorEl.style.display = 'block';
-                errorEl.textContent = `API Error: ${status}`;
-                finishSearch();
-                return;
-            }
-
-            if (results && results.length > 0) {
-                fetchedCount += results.length;
-                const locName = localitiesToSearch[currentLocalityIndex] || currentCity;
-                updateStatus(`Extracted ${results.length} listings in ${locName}. Qualifying...`);
-
-                for (const place of results) {
-                    await fetchPlaceDetails(place.place_id, place.name);
-                    await new Promise(r => setTimeout(r, 500));
+                    if (pagination && pagination.hasNextPage) {
+                        pageCount++;
+                        setTimeout(() => pagination.nextPage(), 2500);
+                    } else {
+                        resolve(fetchedInThisSearch);
+                    }
                 }
-            }
 
-            if (pagination && pagination.hasNextPage && pageCount < 3) {
-                pageCount++;
-                const locName = localitiesToSearch[currentLocalityIndex] || currentCity;
-                updateStatus(`Syncing next page for ${locName} (${pageCount}/3)...`);
-                setTimeout(() => {
-                    pagination.nextPage();
-                }, 3000);
-            } else {
-                currentLocalityIndex++;
-                setTimeout(searchNextLocality, 2000);
-            }
+                placesService.textSearch({ query }, handleResponse);
+            });
         }
 
-        async function fetchPlaceDetails(placeId, fallbackName, retries = 3) {
+        async function performNearbySearchWithPagination(location, keyword) {
+            return new Promise((resolve) => {
+                let fetchedInThisSearch = 0;
+                let pageCount = 1;
+                let retries = 3;
+
+                const request = {
+                    location: location,
+                    radius: 800,
+                    keyword: keyword
+                };
+
+                function handleResponse(results, status, pagination) {
+                    if (shouldStop) return resolve(fetchedInThisSearch);
+
+                    if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
+                        if (retries > 0) {
+                            retries--;
+                            setTimeout(() => {
+                                if (pagination && pagination.hasNextPage) pagination.nextPage();
+                                else placesService.nearbySearch(request, handleResponse);
+                            }, 5000);
+                        } else {
+                            resolve(fetchedInThisSearch);
+                        }
+                        return;
+                    }
+
+                    if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+                        fetchedInThisSearch += results.length;
+                        for (const p of results) {
+                            if (!allRawPlaces.has(p.place_id)) {
+                                allRawPlaces.set(p.place_id, { place_id: p.place_id, name: p.name });
+                            }
+                        }
+                    }
+
+                    if (pagination && pagination.hasNextPage) {
+                        pageCount++;
+                        setTimeout(() => pagination.nextPage(), 2500);
+                    } else {
+                        resolve(fetchedInThisSearch);
+                    }
+                }
+
+                placesService.nearbySearch(request, handleResponse);
+            });
+        }
+
+        async function geocodeLocality(loc, city) {
+            return new Promise((resolve) => {
+                const addressStr = loc && loc !== city ? `${loc}, ${city}` : city;
+                const request = {
+                    query: addressStr,
+                    fields: ['geometry']
+                };
+                placesService.findPlaceFromQuery(request, (results, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0] && results[0].geometry) {
+                        resolve(results[0].geometry.location);
+                    } else {
+                        resolve(null);
+                    }
+                });
+            });
+        }
+
+        function getGridPoints(center) {
+            const lat = center.lat();
+            const lng = center.lng();
+            const offset = 0.005; // approx 500-600m radius
+            return [
+                center,
+                new google.maps.LatLng(lat + offset, lng),
+                new google.maps.LatLng(lat - offset, lng),
+                new google.maps.LatLng(lat, lng + offset),
+                new google.maps.LatLng(lat, lng - offset)
+            ];
+        }
+
+        async function fetchPlaceDetails(placeId, fallbackName, retries = 5) {
             return new Promise((resolve) => {
                 const request = {
                     placeId: placeId,
@@ -641,44 +698,150 @@
                 };
                 
                 placesService.getDetails(request, (place, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK) {
-                        if (place.formatted_phone_number && !place.website) {
-                            const name = place.name || fallbackName;
-                            const phone = place.formatted_phone_number;
-                            const mapsUrl = place.url || `https://www.google.com/maps/place/?q=place_id:${placeId}`;
-                            allResults.push({ name, phone, mapsUrl });
-                            phoneCount++;
-                            updateStatus(`Found ${phoneCount} qualified numbers...`);
-                            
-                            if (exportBtn.style.display !== 'flex') {
-                                exportBtn.style.display = 'flex';
-                                clearBtn.style.display = 'flex';
-                            }
-                            exportBtn.querySelector('.btn-text').textContent = `Export ${phoneCount} Contacts`;
-                            
-                            renderResult(name, phone, mapsUrl);
-                        }
-                        resolve(true);
+                    if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                        resolve({
+                            name: place.name || fallbackName,
+                            phone: place.formatted_phone_number || null,
+                            website: place.website || null,
+                            mapsUrl: place.url || `https://www.google.com/maps/place/?q=place_id:${placeId}`
+                        });
                     } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT && retries > 0) {
-                        const delay = (4 - retries) * 1000;
+                        const rDelay = (6 - retries) * 1500;
                         setTimeout(() => {
                             resolve(fetchPlaceDetails(placeId, fallbackName, retries - 1));
-                        }, delay);
+                        }, rDelay);
                     } else {
-                        resolve(false);
+                        resolve(null);
                     }
                 });
             });
         }
+        
+        async function processLocality(bType, loc, city, idx, total) {
+            const initialGlobalSize = allRawPlaces.size;
+            let locRawFetched = 0;
+            let queriesExecuted = 0;
+            let gridNodesExecuted = 0;
+            
+            updateStatus(`Processing Locality [${idx}/${total}]: ${loc}...`);
+
+            // 1. Text Search Variants
+            const variants = getQueryVariants(bType, loc, city);
+            for (let i = 0; i < variants.length; i++) {
+                if (shouldStop) return;
+                const query = variants[i];
+                updateStatus(`[${loc}] Query ${i + 1}/${variants.length}: "${query}"...`);
+                const fetched = await performTextSearchWithPagination(query);
+                locRawFetched += fetched;
+                queriesExecuted++;
+                await delay(800); // Buffer between queries to respect API limits
+            }
+
+            // 2. Geo Grid Search
+            updateStatus(`[${loc}] Resolving geo-coordinates for grid search...`);
+            const center = await geocodeLocality(loc, city);
+            if (center && !shouldStop) {
+                const gridPoints = getGridPoints(center);
+                for (let i = 0; i < gridPoints.length; i++) {
+                    if (shouldStop) return;
+                    updateStatus(`[${loc}] Geo Grid Node ${i + 1}/${gridPoints.length}...`);
+                    const fetched = await performNearbySearchWithPagination(gridPoints[i], bType);
+                    locRawFetched += fetched;
+                    gridNodesExecuted++;
+                    await delay(800);
+                }
+            } else if (!center) {
+                console.warn(`Could not geocode locality: ${loc}, ${city}`);
+            }
+
+            // Logging & Stats
+            const locUniqueAdded = allRawPlaces.size - initialGlobalSize;
+            console.log(`=== STATS FOR LOCALITY: ${loc} ===`);
+            console.log(`total_results_fetched (raw): ${locRawFetched}`);
+            console.log(`total_unique_results_added: ${locUniqueAdded}`);
+            console.log(`queries_executed_count: ${queriesExecuted}`);
+            console.log(`grid_nodes_executed_count: ${gridNodesExecuted}`);
+            if (locRawFetched < 20) {
+                console.warn(`Query expansion may be insufficient for ${loc} - fetched < 20 raw results.`);
+            }
+        }
+
+        async function enrichAndFilterResults() {
+            const placesToProcess = Array.from(allRawPlaces.values());
+            let processedCount = 0;
+            
+            for (const place of placesToProcess) {
+                if (shouldStop) break;
+                processedCount++;
+                updateStatus(`Qualifying Place [${processedCount}/${placesToProcess.length}]... (Found: ${phoneCount} qualified)`);
+                
+                const details = await fetchPlaceDetails(place.place_id, place.name);
+                if (details && details.phone && !details.website) {
+                    allResults.push({ name: details.name, phone: details.phone, mapsUrl: details.mapsUrl });
+                    phoneCount++;
+                    
+                    if (exportBtn.style.display !== 'flex') {
+                        exportBtn.style.display = 'flex';
+                        clearBtn.style.display = 'flex';
+                    }
+                    exportBtn.querySelector('.btn-text').textContent = `Export ${phoneCount} Contacts`;
+                    renderResult(details.name, details.phone, details.mapsUrl);
+                }
+                
+                // Delay to prevent overloading Google's API during thousands of detail requests
+                await delay(600);
+            }
+            
+            console.log(`=== FINAL SYSTEM STATS ===`);
+            console.log(`total_unique_results: ${allRawPlaces.size}`);
+            console.log(`total_qualified_results: ${phoneCount}`);
+        }
+
+        async function performSearch() {
+            const bType = businessTypeInput.value.trim();
+            const city = cityInput.value.trim();
+            const locs = localitiesInput.value.trim();
+            
+            if (!bType || !city || isSearching || !placesService) return;
+
+            let localitiesToSearch = locs ? locs.split(',').map(s => s.trim()).filter(Boolean) : [city];
+            
+            isSearching = true;
+            shouldStop = false;
+            searchBtn.disabled = true;
+            businessTypeInput.disabled = true;
+            cityInput.disabled = true;
+            localitiesInput.disabled = true;
+            searchBtn.classList.add('searching');
+            errorEl.style.display = 'none';
+
+            updateStatus('Starting Expanded Search Sequence...');
+
+            for (let i = 0; i < localitiesToSearch.length; i++) {
+                const locality = localitiesToSearch[i];
+                if (shouldStop) break;
+                await processLocality(bType, locality, city, i + 1, localitiesToSearch.length);
+            }
+
+            if (!shouldStop) {
+                updateStatus(`Extraction complete. Qualifying ${allRawPlaces.size} unique businesses (this may take a while)...`);
+                await enrichAndFilterResults();
+                
+                if (!shouldStop) {
+                    finishSearch();
+                }
+            }
+        }
 
         function finishSearch() {
-            updateStatus(`Sequence complete. Found ${phoneCount} contacts.`);
+            updateStatus(`Sequence complete. Found ${phoneCount} qualified contacts from ${allRawPlaces.size} unique raw extractions.`);
             if (phoneCount > 0) {
                 exportBtn.style.display = 'flex';
                 clearBtn.style.display = 'flex';
                 exportBtn.querySelector('.btn-text').textContent = `Export ${phoneCount} Contacts`;
             }
             isSearching = false;
+            shouldStop = false;
             searchBtn.disabled = false;
             businessTypeInput.disabled = false;
             cityInput.disabled = false;
