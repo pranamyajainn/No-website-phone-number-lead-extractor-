@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>No-Website Lead Extractor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Atmospheric Background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(168, 85, 247, 0.15) 0%, transparent 50%);
+            z-index: -1;
+            animation: drift 20s ease-in-out infinite alternate;
+        }
+
+        @keyframes drift {
+            from { transform: scale(1); }
+            to { transform: scale(1.1); }
+        }
+
+        .container {
+            width: 100%;
+            max-width: 540px;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 40px;
+            border-radius: 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.025em;
+            background: linear-gradient(to bottom right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: 8px;
+        }
+
+        .search-box {
+            position: relative;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-align: left;
+            font-weight: 500;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 16px 20px;
+            background: var(--glass-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        textarea {
+            width: 100%;
+            padding: 16px 20px;
+            background: var(--glass-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            color: white;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        input[type="text"]:disabled, textarea:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button#searchBtn {
+            width: 100%;
+            padding: 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        button#searchBtn:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+        }
+
+        button#searchBtn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button#searchBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-container {
+            margin-bottom: 24px;
+            padding: 12px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+        }
+
+        .status {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--primary);
+        }
+
+        .error {
+            color: #f87171;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: rgba(248, 113, 113, 0.1);
+            border-radius: 12px;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+            display: none;
+        }
+
+        .results-container {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-right: -10px;
+            padding-right: 10px;
+        }
+
+        .results-container::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .results-container::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+
+        .results {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: var(--glass-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            transition: all 0.2s ease;
+            animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .result-item:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .business-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow: hidden;
+        }
+
+        .business-name {
+            font-weight: 600;
+            font-size: 0.9375rem;
+        }
+
+        .phone-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .phone-link {
+            background: var(--primary);
+            color: white;
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 99px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            min-width: 140px;
+            text-align: center;
+            display: inline-block;
+            box-sizing: border-box;
+        }
+
+        .phone-link:hover {
+            background: var(--primary-hover);
+            transform: scale(1.05);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .export-btn, .clear-btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .export-btn {
+            background: var(--success);
+            color: white;
+        }
+
+        .export-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -5px rgba(16, 185, 129, 0.4);
+        }
+
+        .clear-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid var(--border);
+        }
+
+        .clear-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-1px);
+        }
+
+        .loader {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .searching .loader {
+            display: block;
+        }
+
+        .searching .btn-text {
+            display: none;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 24px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>No-Website Lead Extractor</h1>
+            <p class="subtitle">Find local businesses without websites for web dev outreach</p>
+        </header>
+
+        <div class="search-box">
+            <div class="form-group">
+                <label>Business Type</label>
+                <input type="text" id="businessType" placeholder="e.g. Travel agency" disabled />
+            </div>
+            <div class="form-group">
+                <label>City</label>
+                <input type="text" id="cityInput" placeholder="e.g. Bangalore" disabled />
+            </div>
+            <div class="form-group">
+                <label>Localities (comma separated)</label>
+                <textarea id="localitiesInput" placeholder="e.g. Mathikere, Indiranagar, New BEL Road, Whitefield..." disabled></textarea>
+            </div>
+            <button id="searchBtn" disabled>
+                <div class="loader"></div>
+                <span class="btn-text">Initialize</span>
+            </button>
+        </div>
+
+        <div id="error" class="error"></div>
+
+        <div class="status-container">
+            <div id="status" class="status">Initializing system...</div>
+        </div>
+
+        <div class="results-container">
+            <ul id="resultsList" class="results"></ul>
+        </div>
+
+        <div class="action-buttons">
+            <button id="exportBtn" class="export-btn">
+                <span class="btn-text">Export CSV</span>
+            </button>
+            <button id="clearBtn" class="clear-btn">
+                <span class="btn-text">Clear</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Use Vite environment variable replacement to avoid hardcoding secrets in source control
+        const API_KEY = "%VITE_GOOGLE_MAPS_API_KEY%";
+
+        const businessTypeInput = document.getElementById('businessType');
+        const cityInput = document.getElementById('cityInput');
+        const localitiesInput = document.getElementById('localitiesInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const statusEl = document.getElementById('status');
+        const errorEl = document.getElementById('error');
+        const resultsList = document.getElementById('resultsList');
+        const exportBtn = document.getElementById('exportBtn');
+        const clearBtn = document.getElementById('clearBtn');
+
+        let fetchedCount = 0;
+        let phoneCount = 0;
+        let allResults = [];
+        let isSearching = false;
+        let placesService;
+        let pageCount = 0;
+        let currentLocalityIndex = 0;
+        let localitiesToSearch = [];
+        let currentBusinessType = "";
+        let currentCity = "";
+
+        const defaultLocalities = {
+            'bangalore': 'Mathikere, Indiranagar, New BEL Road, Whitefield, Koramangala, Jayanagar, JP Nagar, HSR Layout, BTM Layout, Electronic City, Marathahalli, Bellandur, Malleshwaram, Rajajinagar, Banashankari, Yelahanka, Hebbal, Kengeri, Basavanagudi, Frazer Town, RT Nagar, Vidyaranyapura, Yelahanka New Town, Kammanahalli, Kalyan Nagar, HBR Layout, Sahakara Nagar, Peenya, Yeshwanthpur, Dasarahalli, Nagarbhavi, Vijay Nagar, Mahalakshmi Layout, Basaveshwaranagar, Rajarajeshwari Nagar',
+            'bengaluru': 'Mathikere, Indiranagar, New BEL Road, Whitefield, Koramangala, Jayanagar, JP Nagar, HSR Layout, BTM Layout, Electronic City, Marathahalli, Bellandur, Malleshwaram, Rajajinagar, Banashankari, Yelahanka, Hebbal, Kengeri, Basavanagudi, Frazer Town, RT Nagar, Vidyaranyapura, Yelahanka New Town, Kammanahalli, Kalyan Nagar, HBR Layout, Sahakara Nagar, Peenya, Yeshwanthpur, Dasarahalli, Nagarbhavi, Vijay Nagar, Mahalakshmi Layout, Basaveshwaranagar, Rajarajeshwari Nagar',
+            'mumbai': 'Andheri, Bandra, Juhu, Colaba, Lower Parel, Dadar, Borivali, Malad, Goregaon, Powai, Kurla, Vile Parle, Chembur, Ghatkopar, Mulund, Navi Mumbai, Thane, South Mumbai, Western Suburbs, Eastern Suburbs',
+            'delhi': 'Connaught Place, Karol Bagh, Hauz Khas, Saket, Vasant Kunj, Lajpat Nagar, Rajouri Garden, Rohini, Dwarka, Janakpuri, Pitampura, Laxmi Nagar, Mayur Vihar, Chandni Chowk, South Extension, Greater Kailash, Defence Colony, Green Park',
+            'hyderabad': 'Banjara Hills, Jubilee Hills, HITEC City, Gachibowli, Madhapur, Kondapur, Kukatpally, Ameerpet, SR Nagar, Secunderabad, Begumpet, Somajiguda, Panjagutta, Khairatabad, Dilsukhnagar, LB Nagar, Charminar, Tolichowki, Mehdipatnam',
+            'chennai': 'T Nagar, Adyar, Velachery, Anna Nagar, Mylapore, Nungambakkam, OMR, ECR, Besant Nagar, Guindy, Thiruvanmiyur, Alwarpet, Royapettah, Tambaram, Chromepet, Porur, Vadapalani, Saidapet, Perambur, Kilpauk',
+            'pune': 'Koregaon Park, Viman Nagar, Kalyani Nagar, Hinjewadi, Magarpatta, Hadapsar, Kothrud, Deccan Gymkhana, Shivaji Nagar, Baner, Aundh, Wakad, Pimple Saudagar, Kharadi, Camp, FC Road, JM Road',
+            'kolkata': 'Park Street, Salt Lake, New Town, Ballygunge, Alipore, Gariahat, Jadavpur, Behala, Dum Dum, Rajarhat, Sector 5, Howrah, Bhowanipore, New Alipore, Topsia, Kasba, Ruby, EM Bypass'
+        };
+
+        cityInput.addEventListener('input', (e) => {
+            const city = e.target.value.toLowerCase().trim();
+            if (defaultLocalities[city]) {
+                localitiesInput.value = defaultLocalities[city];
+            }
+        });
+
+        // Dynamically load Google Maps JS API
+        window.initPlaces = function() {
+            placesService = new google.maps.places.PlacesService(document.createElement('div'));
+            businessTypeInput.disabled = false;
+            cityInput.disabled = false;
+            localitiesInput.disabled = false;
+            searchBtn.disabled = false;
+            searchBtn.querySelector('.btn-text').textContent = 'Search';
+            updateStatus('System Ready');
+        };
+
+        window.gm_authFailure = function() {
+            errorEl.style.display = 'block';
+            errorEl.innerHTML = `
+                <strong>API Key Error:</strong> The provided API key is invalid or not authorized for the Maps JavaScript API.<br><br>
+                <strong>How to fix:</strong><br>
+                1. Enable <strong>Maps JavaScript API</strong> in Google Cloud Console.<br>
+                2. Ensure your API key restrictions allow this API.
+            `;
+            updateStatus('Initialization failed');
+            searchBtn.disabled = true;
+            searchBtn.querySelector('.btn-text').textContent = 'Auth Error';
+        };
+
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places&callback=initPlaces`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = () => {
+            errorEl.style.display = 'block';
+            errorEl.textContent = "Failed to load Google Maps API. Check your network.";
+            updateStatus('Network Error');
+        };
+        document.head.appendChild(script);
+
+        searchBtn.addEventListener('click', performSearch);
+        exportBtn.addEventListener('click', exportCSV);
+        clearBtn.addEventListener('click', () => {
+            allResults = [];
+            phoneCount = 0;
+            resultsList.innerHTML = '';
+            exportBtn.style.display = 'none';
+            clearBtn.style.display = 'none';
+            updateStatus('Results cleared.');
+        });
+
+        function performSearch() {
+            const bType = businessTypeInput.value.trim();
+            const city = cityInput.value.trim();
+            const locs = localitiesInput.value.trim();
+            
+            if (!bType || !city || isSearching || !placesService) return;
+
+            localitiesToSearch = locs ? locs.split(',').map(s => s.trim()).filter(Boolean) : [""];
+
+            currentBusinessType = bType;
+            currentCity = city;
+            currentLocalityIndex = 0;
+
+            isSearching = true;
+            searchBtn.disabled = true;
+            businessTypeInput.disabled = true;
+            cityInput.disabled = true;
+            localitiesInput.disabled = true;
+            searchBtn.classList.add('searching');
+            // We no longer clear allResults or phoneCount so they accumulate across searches
+            // But we do want to hide the error message
+            errorEl.style.display = 'none';
+            fetchedCount = 0;
+            updateStatus('Starting search sequence...');
+
+            searchNextLocality();
+        }
+
+        function searchNextLocality() {
+            if (currentLocalityIndex >= localitiesToSearch.length || !isSearching) {
+                finishSearch();
+                return;
+            }
+
+            const locality = localitiesToSearch[currentLocalityIndex];
+            pageCount = 1;
+            
+            if (locality) {
+                updateStatus(`Searching in ${locality} (${currentLocalityIndex + 1}/${localitiesToSearch.length})...`);
+            } else {
+                updateStatus(`Searching in ${currentCity}...`);
+            }
+            
+            const query = locality ? `${currentBusinessType} in ${locality}, ${currentCity}` : `${currentBusinessType} in ${currentCity}`;
+            const request = { query: query };
+            
+            placesService.textSearch(request, handleSearchResults);
+        }
+
+        async function handleSearchResults(results, status, pagination) {
+            if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS && fetchedCount === 0 && currentLocalityIndex === 0 && localitiesToSearch.length === 1) {
+                errorEl.style.display = 'block';
+                errorEl.textContent = "No results found for this query";
+                finishSearch();
+                return;
+            }
+
+            if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT) {
+                updateStatus(`Rate limit hit. Waiting 5s before retrying ${localitiesToSearch[currentLocalityIndex]}...`);
+                setTimeout(() => {
+                    if (pagination && pagination.hasNextPage) {
+                        pagination.nextPage();
+                    } else {
+                        const query = localitiesToSearch[currentLocalityIndex] ? `${currentBusinessType} in ${localitiesToSearch[currentLocalityIndex]}, ${currentCity}` : `${currentBusinessType} in ${currentCity}`;
+                        placesService.textSearch({ query: query }, handleSearchResults);
+                    }
+                }, 5000);
+                return;
+            }
+
+            if (status === google.maps.places.PlacesServiceStatus.INVALID_REQUEST) {
+                finishSearch();
+                return;
+            }
+
+            if (status !== google.maps.places.PlacesServiceStatus.OK && status !== google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+                errorEl.style.display = 'block';
+                errorEl.textContent = `API Error: ${status}`;
+                finishSearch();
+                return;
+            }
+
+            if (results && results.length > 0) {
+                fetchedCount += results.length;
+                const locName = localitiesToSearch[currentLocalityIndex] || currentCity;
+                updateStatus(`Extracted ${results.length} listings in ${locName}. Qualifying...`);
+
+                for (const place of results) {
+                    await fetchPlaceDetails(place.place_id, place.name);
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+
+            if (pagination && pagination.hasNextPage && pageCount < 3) {
+                pageCount++;
+                const locName = localitiesToSearch[currentLocalityIndex] || currentCity;
+                updateStatus(`Syncing next page for ${locName} (${pageCount}/3)...`);
+                setTimeout(() => {
+                    pagination.nextPage();
+                }, 3000);
+            } else {
+                currentLocalityIndex++;
+                setTimeout(searchNextLocality, 2000);
+            }
+        }
+
+        async function fetchPlaceDetails(placeId, fallbackName, retries = 3) {
+            return new Promise((resolve) => {
+                const request = {
+                    placeId: placeId,
+                    fields: ['name', 'formatted_phone_number', 'url', 'website']
+                };
+                
+                placesService.getDetails(request, (place, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK) {
+                        if (place.formatted_phone_number && !place.website) {
+                            const name = place.name || fallbackName;
+                            const phone = place.formatted_phone_number;
+                            const mapsUrl = place.url || `https://www.google.com/maps/place/?q=place_id:${placeId}`;
+                            allResults.push({ name, phone, mapsUrl });
+                            phoneCount++;
+                            updateStatus(`Found ${phoneCount} qualified numbers...`);
+                            
+                            if (exportBtn.style.display !== 'flex') {
+                                exportBtn.style.display = 'flex';
+                                clearBtn.style.display = 'flex';
+                            }
+                            exportBtn.querySelector('.btn-text').textContent = `Export ${phoneCount} Contacts`;
+                            
+                            renderResult(name, phone, mapsUrl);
+                        }
+                        resolve(true);
+                    } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT && retries > 0) {
+                        const delay = (4 - retries) * 1000;
+                        setTimeout(() => {
+                            resolve(fetchPlaceDetails(placeId, fallbackName, retries - 1));
+                        }, delay);
+                    } else {
+                        resolve(false);
+                    }
+                });
+            });
+        }
+
+        function finishSearch() {
+            updateStatus(`Sequence complete. Found ${phoneCount} contacts.`);
+            if (phoneCount > 0) {
+                exportBtn.style.display = 'flex';
+                clearBtn.style.display = 'flex';
+                exportBtn.querySelector('.btn-text').textContent = `Export ${phoneCount} Contacts`;
+            }
+            isSearching = false;
+            searchBtn.disabled = false;
+            businessTypeInput.disabled = false;
+            cityInput.disabled = false;
+            localitiesInput.disabled = false;
+            searchBtn.classList.remove('searching');
+        }
+
+        function renderResult(name, phone, mapsUrl) {
+            const li = document.createElement('li');
+            li.className = 'result-item';
+            li.style.animationDelay = `${resultsList.children.length * 0.05}s`;
+
+            li.innerHTML = `
+                <div class="business-info">
+                    <span class="business-name">${name}</span>
+                    <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="maps-link" style="color: var(--primary); font-size: 0.8125rem; text-decoration: none; margin-top: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"></polygon></svg>
+                        View on Maps
+                    </a>
+                </div>
+                <div class="phone-pill">
+                    <a href="tel:${phone.replace(/[^0-9+]/g, '')}" class="phone-link">${phone}</a>
+                </div>
+            `;
+            resultsList.appendChild(li);
+        }
+
+        function exportCSV() {
+            if (allResults.length === 0) return;
+            let csvContent = "Company Name,Phone Number,Google Maps Link\n";
+            allResults.forEach(row => {
+                csvContent += `"${row.name.replace(/"/g, '""')}","${row.phone}","${row.mapsUrl}"\n`;
+            });
+            const bom = "\uFEFF";
+            const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "extracted_leads.csv";
+            link.click();
+        }
+
+        function updateStatus(msg) {
+            statusEl.textContent = msg;
+        }
+    </script>
+</body>
+</html>
