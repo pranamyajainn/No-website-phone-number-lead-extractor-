@@ -460,24 +460,6 @@
         let allRawPlaces = new Map();
         let shouldStop = false;
 
-        const defaultLocalities = {
-            'bangalore': 'Mathikere, Indiranagar, New BEL Road, Whitefield, Koramangala, Jayanagar, JP Nagar, HSR Layout, BTM Layout, Electronic City, Marathahalli, Bellandur, Malleshwaram, Rajajinagar, Banashankari, Yelahanka, Hebbal, Kengeri, Basavanagudi, Frazer Town, RT Nagar, Vidyaranyapura, Yelahanka New Town, Kammanahalli, Kalyan Nagar, HBR Layout, Sahakara Nagar, Peenya, Yeshwanthpur, Dasarahalli, Nagarbhavi, Vijay Nagar, Mahalakshmi Layout, Basaveshwaranagar, Rajarajeshwari Nagar',
-            'bengaluru': 'Mathikere, Indiranagar, New BEL Road, Whitefield, Koramangala, Jayanagar, JP Nagar, HSR Layout, BTM Layout, Electronic City, Marathahalli, Bellandur, Malleshwaram, Rajajinagar, Banashankari, Yelahanka, Hebbal, Kengeri, Basavanagudi, Frazer Town, RT Nagar, Vidyaranyapura, Yelahanka New Town, Kammanahalli, Kalyan Nagar, HBR Layout, Sahakara Nagar, Peenya, Yeshwanthpur, Dasarahalli, Nagarbhavi, Vijay Nagar, Mahalakshmi Layout, Basaveshwaranagar, Rajarajeshwari Nagar',
-            'mumbai': 'Andheri, Bandra, Juhu, Colaba, Lower Parel, Dadar, Borivali, Malad, Goregaon, Powai, Kurla, Vile Parle, Chembur, Ghatkopar, Mulund, Navi Mumbai, Thane, South Mumbai, Western Suburbs, Eastern Suburbs',
-            'delhi': 'Connaught Place, Karol Bagh, Hauz Khas, Saket, Vasant Kunj, Lajpat Nagar, Rajouri Garden, Rohini, Dwarka, Janakpuri, Pitampura, Laxmi Nagar, Mayur Vihar, Chandni Chowk, South Extension, Greater Kailash, Defence Colony, Green Park',
-            'hyderabad': 'Banjara Hills, Jubilee Hills, HITEC City, Gachibowli, Madhapur, Kondapur, Kukatpally, Ameerpet, SR Nagar, Secunderabad, Begumpet, Somajiguda, Panjagutta, Khairatabad, Dilsukhnagar, LB Nagar, Charminar, Tolichowki, Mehdipatnam',
-            'chennai': 'T Nagar, Adyar, Velachery, Anna Nagar, Mylapore, Nungambakkam, OMR, ECR, Besant Nagar, Guindy, Thiruvanmiyur, Alwarpet, Royapettah, Tambaram, Chromepet, Porur, Vadapalani, Saidapet, Perambur, Kilpauk',
-            'pune': 'Koregaon Park, Viman Nagar, Kalyani Nagar, Hinjewadi, Magarpatta, Hadapsar, Kothrud, Deccan Gymkhana, Shivaji Nagar, Baner, Aundh, Wakad, Pimple Saudagar, Kharadi, Camp, FC Road, JM Road',
-            'kolkata': 'Park Street, Salt Lake, New Town, Ballygunge, Alipore, Gariahat, Jadavpur, Behala, Dum Dum, Rajarhat, Sector 5, Howrah, Bhowanipore, New Alipore, Topsia, Kasba, Ruby, EM Bypass'
-        };
-
-        cityInput.addEventListener('input', (e) => {
-            const city = e.target.value.toLowerCase().trim();
-            if (defaultLocalities[city]) {
-                localitiesInput.value = defaultLocalities[city];
-            }
-        });
-
         // Dynamically load Google Maps JS API
         window.initPlaces = function() {
             placesService = new google.maps.places.PlacesService(document.createElement('div'));
